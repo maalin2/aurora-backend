@@ -4,7 +4,24 @@ A high-performance message search engine that queries an external data source an
 
 ## What It Does
 
-This API fetches message data from an external source on startup, caches it in-memory, and provides fast substring search with pagination. The prefetching approach eliminates external API latency from request handling, delivering <10ms response times per query.
+This API fetches message data from an external source on startup, caches it in-memory, and provides fast substring search with pagination. The prefetching approach eliminates external API latency from request handling, delivering results in under 100ms.
+
+## Live Demo
+
+API is deployed and publicly accessible:
+
+```
+http://ec2-18-188-23-166.us-east-2.compute.amazonaws.com:8000
+```
+
+- **Swagger docs**: `/docs`
+- **Health check**: `/`
+- **Search endpoint**: `/search?q=QUERY&page=1&size=10`
+
+Example:
+```
+http://ec2-18-188-23-166.us-east-2.compute.amazonaws.com:8000/search?q=Paris
+```
 
 ## Getting Started
 
