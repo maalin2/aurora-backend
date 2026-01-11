@@ -3,11 +3,24 @@ from collections.abc import AsyncGenerator
 from fastapi import FastAPI, Query, Request, HTTPException
 import httpx
 
+SOURCE = 'https://november7-730026606190.europe-west1.run.app/messages/'
+
 @asynccontextmanager
 # prevent leaks
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.client = httpx.AsyncClient(timeout=30)
     print('startup: http client created')
+
+    # prefetch data from external API on startup
+    try:
+        response = await app.state.client.get(SOURCE)
+        response.raise_for_status()
+        data = response.json()
+        app.state.messages = data.get('items', [])
+        print(f'startup: prefetched {len(app.state.messages)} messages')
+    except Exception as e:
+        print(f'startup: error prefetching data: {e}')
+        raise
 
     # start running requests
     yield
@@ -17,8 +30,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
-
-SOURCE = 'https://november7-730026606190.europe-west1.run.app/messages/'
 
 @app.get("/")
 async def root() -> dict[str, str]:
@@ -33,36 +44,24 @@ async def search(
         page: int = Query(1, ge=1),
         size: int = Query(10, ge=1, le=100)
         ) -> dict:
-    client: httpx.AsyncClient = request.app.state.client
+    messages = request.app.state.messages
 
-    try:
-        response = await client.get(SOURCE)
-        response.raise_for_status()
+    if q:
+        q_lower = q.lower()
+        messages = [
+            m for m in messages
+            if q_lower in m.get('message', '').lower()
+        ]
 
-        data = response.json()
+    total = len(messages)
+    start = (page - 1) * size
+    end = start + size
+    results = messages[start:end]
 
-        messages = data.get('items', [])
-
-        if q:
-            q_lower= q.lower()
-            messages = [
-                m for m in messages
-                if q_lower in m.get('message', '').lower()
-            ]
-
-
-        total = len(messages)
-        start = (page - 1) * size
-        end = start + size
-        results = messages[start:end]
-
-        return {
-            'total': total,
-            'page': page,
-            'size': size,
-            'results': results
-        }
-
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"api error: {str(e)}")
+    return {
+        'total': total,
+        'page': page,
+        'size': size,
+        'results': results
+    }
 
